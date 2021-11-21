@@ -243,6 +243,12 @@ func main() {
 	}
 }
 
+func heartbeat() {
+	mu.Lock()
+	defer mu.Unlock()
+
+}
+
 func newConnection() error {
 	mu.Lock()
 	defer mu.Unlock()

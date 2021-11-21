@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -112,5 +114,38 @@ func (l *localServer) Write() {
 }
 
 func main() {
+	// 1. 初始化主要链接
+	conn, err := newConn(localAddr)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
+	conn.SetReadDeadline(time.Now().Add(time.Second * 10))
+	for {
+		buf := make([]byte, 10240)
+		n, err := conn.Read(buf)
+		if err != nil {
+			if strings.Contains(err.Error(), "timeout") {
+				conn.SetReadDeadline(time.Now().Add(time.Second * 3))
+				conn.Write([]byte("0x"))
+			}
+		}
+	}
+}
+
+// newConn 初始化新联接
+func newConn(localAddr string) (net.Conn, error) {
+	crt, err := tls.LoadX509KeyPair(certificateCrt, certificateKey)
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig := &tls.Config{}
+	tlsConfig.Certificates = []tls.Certificate{crt}
+	tlsConfig.Time = time.Now
+	tlsConfig.Rand = rand.Reader
+	localConn, err := tls.Dial("tcp", localAddr, tlsConfig)
+	if err != nil {
+		return nil, err
+	}
+	return localConn, nil
 }
