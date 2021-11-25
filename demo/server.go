@@ -33,11 +33,13 @@ func HandleClientConnect(conn net.Conn) {
 func main() {
 	log.SetFlags(log.LstdFlags | log.Llongfile)
 
-	crt, err := tls.LoadX509KeyPair("server.crt", "server.key")
+	crt, err := tls.LoadX509KeyPair("proxy.crt", "proxy.key")
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true, //这里是跳过证书验证，因为证书签发机构的CA证书是不被认证的
+	}
 	tlsConfig.Certificates = []tls.Certificate{crt}
 	tlsConfig.Time = time.Now
 	tlsConfig.Rand = rand.Reader

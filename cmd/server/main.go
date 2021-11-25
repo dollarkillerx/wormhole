@@ -24,8 +24,8 @@ var (
 
 func init() {
 	fmt.Println("Wormhole Server")
-	flag.IntVar(&localPort, "l", 8087, "local port")
-	flag.IntVar(&remotePort, "r", 8087, "remote port")
+	flag.IntVar(&localPort, "l", 8087, "local port client通讯端口")
+	flag.IntVar(&remotePort, "r", 8088, "remote port 代理端口")
 	flag.StringVar(&certificateCrt, "c", "proxy.crt", "proxy.crt")
 	flag.StringVar(&certificateKey, "k", "proxy.key", "proxy.key")
 	flag.BoolVar(&debug, "d", false, "debug")
@@ -42,18 +42,18 @@ type localServer struct {
 }
 
 func (l *localServer) Read() {
-	l.conn.SetReadDeadline(time.Now().Add(time.Second * 10))
+	//l.conn.SetReadDeadline(time.Now().Add(time.Second * 10))
 	for {
 		data := make([]byte, 10240)
 		n, err := l.conn.Read(data)
 		if err != nil && err != io.EOF {
 			if strings.Contains(err.Error(), "timeout") {
-				l.conn.SetReadDeadline(time.Now().Add(time.Second * 3))
+				//l.conn.SetReadDeadline(time.Now().Add(time.Second * 3))
 				l.conn.Write([]byte("0x"))
 				if debug {
 					log.Println("timeout")
 				}
-				break
+				continue
 			}
 			log.Println(err)
 			l.exit <- err
@@ -99,14 +99,13 @@ type remoteServer struct {
 }
 
 func (r *remoteServer) Read() {
-	r.conn.SetReadDeadline(time.Now().Add(time.Second * 20))
+	//r.conn.SetReadDeadline(time.Now().Add(time.Second * 20))
 	for {
 		data := make([]byte, 10240)
 		n, err := r.conn.Read(data)
 		if err != nil && err != io.EOF {
 			r.exit <- err
 			log.Println(err)
-			break
 		}
 		r.read <- data[:n]
 	}
@@ -222,7 +221,9 @@ func main() {
 			continue
 		}
 
-		fmt.Println("Client conn: ", accept.RemoteAddr())
+		if debug {
+			fmt.Println("Client conn: ", accept.RemoteAddr())
+		}
 
 		buf := make([]byte, 512)
 		read, err := accept.Read(buf)
