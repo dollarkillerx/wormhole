@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -118,22 +119,45 @@ func main() {
 		log.SetFlags(log.LstdFlags | log.Llongfile)
 	}
 
+	for {
+		c := New()
+		if err := c.run(); err != nil {
+			log.Println(err)
+			time.Sleep(time.Second)
+		}
+	}
+}
+
+type coreServer struct {
+}
+
+func New() *coreServer {
+	return &coreServer{}
+}
+
+func (s *coreServer) run() error {
 	// 1. 初始化主要链接
 	conn, err := newConn(remoteAddr)
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
-
-	conn.SetReadDeadline(time.Now().Add(time.Second * 10))
 
 	// 初始化核心链接
 	conn.Write([]byte("start"))
 
+	closeChan := make(chan struct{})
+	overChan := make(chan error)
+
 	// heartbeat
 	go func() {
 		for {
-			conn.Write([]byte("0x"))
-			time.Sleep(time.Second * 3)
+			select {
+			case <-closeChan:
+				close(overChan)
+				return
+			case <-time.After(time.Second * 3):
+				conn.Write([]byte("0x"))
+			}
 		}
 	}()
 
@@ -145,6 +169,11 @@ func main() {
 				conn.SetReadDeadline(time.Now().Add(time.Second * 3))
 				conn.Write([]byte("0x"))
 				continue
+			}
+			if debug {
+				log.Println(err)
+				close(closeChan)
+				break
 			}
 		}
 
@@ -164,6 +193,9 @@ func main() {
 			}()
 		}
 	}
+
+	<-overChan
+	return errors.New("close")
 }
 
 // newConn 初始化新联接

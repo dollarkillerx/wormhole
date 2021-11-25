@@ -169,7 +169,10 @@ func main() {
 				continue
 			}
 
-			fmt.Println("Remote conn: ", accept.RemoteAddr())
+			if debug {
+				fmt.Println("Remote conn: ", accept.RemoteAddr())
+			}
+
 			if err := newConnection(); err != nil {
 				if debug {
 					log.Println(err)
