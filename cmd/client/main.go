@@ -156,7 +156,14 @@ func (s *coreServer) run() error {
 				close(overChan)
 				return
 			case <-time.After(time.Second * 3):
-				conn.Write([]byte("0x"))
+				_, err := conn.Write([]byte("0x"))
+				if err != nil {
+					if debug {
+						log.Println(err)
+					}
+					close(overChan)
+					return
+				}
 			}
 		}
 	}()

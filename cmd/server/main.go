@@ -105,7 +105,10 @@ func (r *remoteServer) Read() {
 		n, err := r.conn.Read(data)
 		if err != nil && err != io.EOF {
 			r.exit <- err
-			log.Println(err)
+			if debug {
+				log.Println(err)
+			}
+			break
 		}
 		r.read <- data[:n]
 	}
@@ -272,6 +275,7 @@ func newConnection() error {
 }
 
 func handle(local *localServer, remote *remoteServer) {
+loop:
 	for {
 		select {
 		case ur := <-remote.read:
@@ -284,7 +288,7 @@ func handle(local *localServer, remote *remoteServer) {
 					log.Println(err)
 				}
 			}
-			break
+			break loop
 		case err := <-local.exit:
 			if debug {
 				if err != nil {
@@ -293,7 +297,7 @@ func handle(local *localServer, remote *remoteServer) {
 			}
 			local.conn.Close()
 			remote.conn.Close()
-			break
+			break loop
 		}
 	}
 }
