@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  wormhole:
+    restart: always
+    image: dollarkiller/wormhole_client:latest
+    volumes:
+      - ./proxy.crt:/app/proxy.crt:ro
+      - ./proxy.key:/app/proxy.key:ro
+    command: /app/wormhole_client_linux_x86 -r 远程服务器地址 -l 本地转发地址 -c /app/proxy.crt -k /app/proxy.key

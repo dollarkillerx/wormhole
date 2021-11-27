@@ -5,3 +5,4 @@ build:
 
 docker_build:
 	docker build -f cmd/server/Dockerfile -t dollarkiller/wormhole:latest  .
+	docker build -f cmd/server/Dockerfile -t dollarkiller/wormhole_client:latest  .

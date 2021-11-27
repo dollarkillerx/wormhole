@@ -7,7 +7,6 @@ services:
     ports:
       - "8200:8200"
       - "8201:8201"
-    tty: true
     volumes:
       - ./proxy.crt:/app/proxy.crt:ro
       - ./proxy.key:/app/proxy.key:ro
