@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+option go_package = "github.com/dollarkillerx/wormhole/internal/proto";
+
+package proto;
+
+service Wormhole {
+  // node -> wormhole
+  rpc RegisterNode(RegisterNodeRequest) returns (RegisterNodeResponse) {}; // 注册节点
+  rpc PenetrateTask(stream PenetrateTaskRequest) returns (stream PenetrateTaskResponse) {}; // 穿透 task 任务下发
+  rpc Penetrate(stream PenetrateRequest) returns (stream PenetrateResponse) {}; // 穿透 core
+
+  // user -> wormhole
+  rpc ListNode(ListNodeRequest) returns (ListNodeResponse) {}; // 节点列表
+  rpc AddTask(AddTaskRequest) returns (AddTaskResponse) {}; // 添加任务
+  rpc ListTask(ListTaskRequest) returns (ListTaskResponse) {}; // 任务列表
+  rpc DelTask(DelTaskRequest) returns (DelTaskResponse) {}; // 删除任务
+
+}
+
+message PenetrateTaskRequest {
+  string nodeId = 1;
+}
+
+message PenetrateTaskResponse {
+  string taskId = 1;
+  int64 localPort = 2;
+}
+
+message PenetrateRequest {
+  string taskId = 1;
+  bytes data = 2;
+}
+
+message PenetrateResponse {
+  bytes data = 1;
+}
+
+message PenetrateInfo {
+  string localAddr = 1;
+}
+
+message ListNodeRequest {
+
+}
+
+message ListNodeResponse {
+  repeated Node nodes = 1;
+}
+
+message Node {
+  string nodeId = 1;
+  string nodeName = 2;
+  string nodeIp = 3;
+}
+
+message AddTaskRequest {
+  string nodeId = 1; // 节点id
+  int64 remotePort = 2; // 远程端口
+  int64 localPort = 3; // 本地端口
+}
+
+message AddTaskResponse {
+  string taskId = 1;
+}
+
+message ListTaskRequest {
+
+}
+
+message ListTaskResponse {
+  repeated Task tasks = 1;
+}
+
+message Task {
+  string taskId = 1;
+  int64 remotePort = 2; // 远程端口
+  int64 localPort = 3; // 本地端口
+  Node node = 4; // task node
+}
+
+message DelTaskRequest {
+  string taskId = 1;
+}
+
+message DelTaskResponse {
+
+}
+
+message RegisterNodeRequest {
+  string token = 1;
+  string nodeId = 2;
+  string nodeName = 3;
+  string nodeIp = 4;
+}
+
+message RegisterNodeResponse {
+
+}

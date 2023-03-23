@@ -6,3 +6,9 @@ build:
 docker_build:
 	docker build -f cmd/server/Dockerfile -t dollarkiller/wormhole:latest  .
 	docker build -f cmd/client/Dockerfile -t dollarkiller/wormhole_client:latest  .
+
+
+build_proto_protocol:
+	protoc --go_out=. --go_opt=paths=source_relative \
+        --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+        internal/proto/*.proto
