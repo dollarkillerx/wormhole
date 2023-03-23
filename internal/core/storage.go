@@ -98,6 +98,19 @@ func (s *flashStorage) getNodeById(nodeId string) (*proto.Node, bool) {
 	return nil, false
 }
 
+func (s *flashStorage) getTaskByIdMu(taskId string) (*proto.Task, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i := range s.Tasks {
+		if s.Tasks[i].TaskId == taskId {
+			return s.Tasks[i], true
+		}
+	}
+
+	return nil, false
+}
+
 func (s *flashStorage) addTask(nodeId string, remotePort int64, localPort int64) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

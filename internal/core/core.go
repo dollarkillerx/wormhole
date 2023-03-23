@@ -125,11 +125,13 @@ loop:
 				if err != nil {
 					return
 				}
-				c.penetrateTaskConn.Storage(core.task.TaskId, accept)
 				server, ex := c.penetrateTask[core.task.Node.NodeId]
 				if !ex {
+					accept.Close()
+					fmt.Println(c.penetrateTask)
 					return
 				}
+				c.penetrateTaskConn.Storage(core.task.TaskId, accept)
 
 				e := server.Send(&proto.PenetrateTaskResponse{
 					TaskId:    core.task.TaskId,
@@ -157,6 +159,37 @@ func (c *CoreServer) ListNode(ctx context.Context, request *proto.ListNodeReques
 
 func (c *CoreServer) AddTask(ctx context.Context, request *proto.AddTaskRequest) (*proto.AddTaskResponse, error) {
 	taskID, err := c.flashStorage.addTask(request.NodeId, request.RemotePort, request.LocalPort)
+	task, _ := c.flashStorage.getTaskByIdMu(taskID)
+
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", request.RemotePort))
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	fmt.Println("ListenTCP: ", addr)
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	var fn = func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		core := &TaskCore{
+			listener: listener,
+			close:    make(chan struct{}),
+			task:     task,
+		}
+
+		go c.processor(core)
+		c.taskConn[taskID] = core
+	}
+
+	fn()
+
 	return &proto.AddTaskResponse{TaskId: taskID}, err
 }
 
