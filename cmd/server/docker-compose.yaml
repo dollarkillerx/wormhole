@@ -1,0 +1,12 @@
+version: "3.3"
+services:
+  wormhole_server:
+    image: wormhole_server:0.0.1
+    container_name: wormhole_server
+    restart: always
+    network_mode: "host"
+    environment:
+      - r=0.0.0.0:8454
+    volumes:
+      - ./configs/:/app/configs
+

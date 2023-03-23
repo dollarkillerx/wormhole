@@ -1,4 +1,5 @@
 FROM alpine:latest
 WORKDIR /app
-COPY wormhole_client_linux_x86 /app
-
+COPY ./cmd/client/wormhole_client /app
+COPY ./configs/ /app/configs
+CMD ["/app/wormhole_client"]

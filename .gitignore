@@ -16,3 +16,4 @@
 .idea
 wormhole_server_linux_x86
 wormhole_client_linux_x86
+*.tar

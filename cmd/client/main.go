@@ -26,6 +26,7 @@ func init() {
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Llongfile)
+	log.Println("rpcAddr: ", rpcAddr, " nodeId: ", nodeId)
 
 	// 设置心跳间隔和超时时间
 	keepAliveParams := keepalive.ClientParameters{

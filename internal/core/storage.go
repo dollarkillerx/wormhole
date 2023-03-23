@@ -25,7 +25,7 @@ func newFlashStorage() *flashStorage {
 }
 
 func (s *flashStorage) init() {
-	file, err := os.ReadFile("wormhole_storage.json")
+	file, err := os.ReadFile("./configs/wormhole_storage.json")
 	if err == nil {
 		err := json.Unmarshal(file, s)
 		if err != nil {
@@ -43,7 +43,7 @@ func (s *flashStorage) flash() {
 		panic(err)
 	}
 
-	err = os.WriteFile("wormhole_storage.json", marshal, 00666)
+	err = os.WriteFile("./configs/wormhole_storage.json", marshal, 00666)
 	if err != nil {
 		panic(err)
 	}
