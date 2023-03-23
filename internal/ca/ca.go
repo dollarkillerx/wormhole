@@ -16,6 +16,15 @@ func LoadTLSCredentials(caCert []byte, serverNameOverride string) (credentials.T
 	return credentials.NewTLS(&tls.Config{ServerName: serverNameOverride, RootCAs: cp}), nil
 }
 
+func LoadTLSServerCredentials(certPEMBlock []byte, keyPEMBlock []byte) (credentials.TransportCredentials, error) {
+	cert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	return credentials.NewTLS(&tls.Config{Certificates: []tls.Certificate{cert}}), nil
+}
+
 const ClientPem = `
 -----BEGIN CERTIFICATE-----
 MIIDRzCCAi+gAwIBAgIJAPnLftTUO93IMA0GCSqGSIb3DQEBCwUAMFIxCzAJBgNV

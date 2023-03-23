@@ -19,21 +19,25 @@ service Wormhole {
 }
 
 message PenetrateTaskRequest {
-  string nodeId = 1;
+  bool heartbeat = 1;
+  string nodeId = 2;
 }
 
 message PenetrateTaskResponse {
-  string taskId = 1;
-  int64 localPort = 2;
+  bool heartbeat = 1;
+  string taskId = 2;
+  int64 localPort = 3;
 }
 
 message PenetrateRequest {
-  string taskId = 1;
-  bytes data = 2;
+  bool heartbeat = 1;
+  string taskId = 2;
+  bytes data = 3;
 }
 
 message PenetrateResponse {
-  bytes data = 1;
+  bool heartbeat = 1;
+  bytes data = 2;
 }
 
 message PenetrateInfo {

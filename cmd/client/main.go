@@ -1,297 +1,141 @@
 package main
 
 import (
-	"crypto/rand"
-	"crypto/tls"
-	"errors"
+	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
-	"strings"
 	"time"
+
+	"github.com/dollarkillerx/wormhole/internal/ca"
+	"github.com/dollarkillerx/wormhole/internal/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
-var (
-	localAddr      string // 本地地址
-	remoteAddr     string // 远程地址
-	certificateCrt string // 证书crt
-	certificateKey string // 证书key
-	debug          bool   // debug mode
-)
+var rpcAddr string
+var nodeId string
 
 func init() {
-	fmt.Println("Wormhole Client")
-	flag.StringVar(&localAddr, "l", "192.168.88.202:8001", "local addr 本地穿透地址")
-	flag.StringVar(&remoteAddr, "r", "127.0.0.1:8087", "remote addr 远程服务地址")
-	flag.StringVar(&certificateCrt, "c", "proxy.crt", "proxy.crt")
-	flag.StringVar(&certificateKey, "k", "proxy.key", "proxy.key")
-	flag.BoolVar(&debug, "d", false, "debug")
+	flag.StringVar(&rpcAddr, "r", "127.0.0.1:8454", "rpc addr")
+	flag.StringVar(&nodeId, "n", "nodeV1", "node id")
 	flag.Parse()
 }
 
-type server struct {
-	conn   net.Conn
-	read   chan []byte
-	write  chan []byte
-	exit   chan error
-	reConn chan bool
-}
-
-func (s *server) Read() {
-	//s.conn.SetReadDeadline(time.Now().Add(time.Second * 10))
-	for {
-		buf := make([]byte, 10240)
-		n, err := s.conn.Read(buf)
-		if err != nil {
-			if strings.Contains(err.Error(), "timeout") {
-				s.conn.SetReadDeadline(time.Now().Add(time.Second * 3))
-				s.conn.Write([]byte("0x"))
-				if debug {
-					log.Println("timeout")
-				}
-				continue
-			}
-
-			log.Println(err)
-			s.exit <- err
-			break
-		}
-
-		if buf[0] == '0' && buf[1] == 'x' {
-			if debug {
-				log.Println("heartbeat")
-			}
-			continue
-		}
-		s.read <- buf[:n]
-	}
-}
-
-func (s *server) Write() {
-	for {
-		select {
-		case data := <-s.write:
-			_, err := s.conn.Write(data)
-			if err != nil {
-				s.exit <- err
-				break
-			}
-		}
-	}
-}
-
-type localServer struct {
-	conn  net.Conn
-	read  chan []byte
-	write chan []byte
-	exit  chan error
-}
-
-func (l *localServer) Read() {
-	for {
-		buf := make([]byte, 10240)
-		n, err := l.conn.Read(buf)
-		if err != nil {
-			l.exit <- err
-			break
-		}
-
-		l.read <- buf[:n]
-	}
-}
-
-func (l *localServer) Write() {
-	for {
-		select {
-		case data := <-l.write:
-			_, err := l.conn.Write(data)
-			if err != nil {
-				l.exit <- err
-				break
-			}
-		}
-	}
-}
-
 func main() {
-	if debug {
-		log.SetFlags(log.LstdFlags | log.Llongfile)
+	log.SetFlags(log.LstdFlags | log.Llongfile)
+
+	// 设置心跳间隔和超时时间
+	keepAliveParams := keepalive.ClientParameters{
+		Time:                10 * time.Second, // 心跳间隔
+		Timeout:             5 * time.Second,  // 超时时间
+		PermitWithoutStream: true,             // 允许无流量的连接
 	}
 
-	for {
-		c := New()
-		if err := c.run(); err != nil {
-			log.Println(err)
-			time.Sleep(time.Second)
-		}
-	}
-}
-
-type coreServer struct {
-}
-
-func New() *coreServer {
-	return &coreServer{}
-}
-
-func (s *coreServer) run() error {
-	// 1. 初始化主要链接
-	conn, err := newConn(remoteAddr)
+	credentials, err := ca.LoadTLSCredentials([]byte(ca.ClientPem), "www.p-pp.cn")
 	if err != nil {
-		return err
+		panic(err)
 	}
 
-	// 初始化核心链接
-	conn.Write([]byte("start"))
+	conn, err := grpc.Dial(rpcAddr, grpc.WithTransportCredentials(credentials), grpc.WithKeepaliveParams(keepAliveParams))
+	if err != nil {
+		panic(err)
+	}
 
-	closeChan := make(chan struct{})
-	overChan := make(chan error)
+	client := proto.NewWormholeClient(conn)
 
-	// heartbeat
+	// 主线程
+	task, err := client.PenetrateTask(context.TODO())
+	if err != nil {
+		panic(err)
+	}
+
+	// 心跳
 	go func() {
 		for {
-			select {
-			case <-closeChan:
-				close(overChan)
-				return
-			case <-time.After(time.Second * 3):
-				_, err := conn.Write([]byte("0x"))
-				if err != nil {
-					if debug {
-						log.Println(err)
-					}
-					close(overChan)
-					return
-				}
+			fmt.Println("node id: ", nodeId)
+			e := task.Send(&proto.PenetrateTaskRequest{
+				NodeId: nodeId,
+			})
+			if e != nil {
+				log.Println(e)
 			}
+
+			time.Sleep(time.Second * 3)
 		}
 	}()
 
 	for {
-		buf := make([]byte, 10240)
-		n, err := conn.Read(buf)
-		if err != nil {
-			if strings.Contains(err.Error(), "timeout") {
-				conn.SetReadDeadline(time.Now().Add(time.Second * 3))
-				conn.Write([]byte("0x"))
-				continue
-			}
-			if debug {
-				log.Println(err)
-				close(closeChan)
-				break
-			}
+		recv, e := task.Recv()
+		if e != nil {
+			log.Println(e)
+			panic(e)
 		}
 
-		// 检测 心跳
-		if buf[0] == '0' && buf[1] == 'x' {
-			if debug {
-				log.Println("heartbeat")
-			}
+		if recv.Heartbeat {
 			continue
 		}
 
-		// 检测新链接
-		if string(buf[:n]) == "new" {
-			go func() {
-				miniServer := NewMiniServer()
-				miniServer.run()
-			}()
+		penetrate, e := client.Penetrate(context.TODO())
+		if e != nil {
+			log.Println(err)
+			continue
 		}
-	}
 
-	<-overChan
-	return errors.New("close")
-}
-
-// newConn 初始化新联接
-func newConn(localAddr string) (net.Conn, error) {
-	crt, err := tls.LoadX509KeyPair(certificateCrt, certificateKey)
-	if err != nil {
-		return nil, err
-	}
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true, //这里是跳过证书验证，因为证书签发机构的CA证书是不被认证的
-	}
-	tlsConfig.Certificates = []tls.Certificate{crt}
-	tlsConfig.Time = time.Now
-	tlsConfig.Rand = rand.Reader
-	localConn, err := tls.Dial("tcp", localAddr, tlsConfig)
-	if err != nil {
-		return nil, err
-	}
-	return localConn, nil
-}
-
-type MiniServer struct {
-}
-
-func NewMiniServer() *MiniServer {
-	return &MiniServer{}
-}
-
-func (m *MiniServer) run() {
-	conn, err := newConn(remoteAddr)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	defer func() {
-		conn.Close()
-	}()
-
-	conn.Write([]byte("new"))
-
-	localConn, err := net.Dial("tcp", localAddr)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	server := &server{
-		conn:   conn,
-		read:   make(chan []byte),
-		write:  make(chan []byte),
-		exit:   make(chan error),
-		reConn: make(chan bool),
-	}
-
-	go server.Read()
-	go server.Write()
-
-	local := &localServer{
-		conn:  localConn,
-		read:  make(chan []byte),
-		write: make(chan []byte),
-		exit:  make(chan error),
-	}
-
-	go local.Read()
-	go local.Write()
-
-loop:
-	for {
-		select {
-		case data, ex := <-server.read:
-			if !ex {
-				break loop
-			}
-			local.write <- data
-		case data, ex := <-local.read:
-			if !ex {
-				break loop
-			}
-			server.write <- data
-		case err := <-server.exit:
-			fmt.Println(err)
-			server.conn.Close()
-			local.conn.Close()
-			server.reConn <- true
-		case err := <-server.exit:
-			fmt.Println(err)
-			local.conn.Close()
+		e = penetrate.Send(&proto.PenetrateRequest{
+			TaskId: recv.TaskId,
+			Data:   nil,
+		})
+		if e != nil {
+			log.Println(e)
+			continue
 		}
+
+		go func() {
+			fmt.Println("dial: ", fmt.Sprintf("127.0.0.1:%d", recv.LocalPort))
+			dial, e := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", recv.LocalPort))
+			if e != nil {
+				log.Println(e)
+				return
+			}
+			defer dial.Close()
+
+			w := proto.WormholePenetrateClientReadWrite{penetrate}
+			go io.Copy(&w, dial)
+			io.Copy(dial, &w)
+
+			//go func() {
+			//	for {
+			//		request, e := penetrate.Recv()
+			//		if e != nil {
+			//			log.Println(e)
+			//			return
+			//		}
+			//		_, e = dial.Write(request.Data)
+			//		if e != nil {
+			//			log.Println(e)
+			//			return
+			//		}
+			//	}
+			//}()
+			//
+			//for {
+			//	buffer := make([]byte, 1024)
+			//	n, e := dial.Read(buffer)
+			//	if e != nil {
+			//		log.Println(e)
+			//		break
+			//	}
+			//	e = penetrate.Send(&proto.PenetrateRequest{
+			//		Data: buffer[:n],
+			//	})
+			//	if e != nil {
+			//		fmt.Println(e)
+			//		break
+			//	}
+			//}
+		}()
 	}
 }

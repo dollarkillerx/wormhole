@@ -12,21 +12,65 @@ import (
 )
 
 type CoreServer struct {
-	flashStorage flashStorage
+	flashStorage *flashStorage
 	proto.UnimplementedWormholeServer
 
-	mu            sync.Mutex
-	taskConn      map[string]*TaskCore
-	penetrate     map[string]chan proto.Wormhole_PenetrateServer
-	penetrateTask map[string]proto.Wormhole_PenetrateTaskServer // 管理器
+	mu                sync.Mutex
+	taskConn          map[string]*TaskCore
+	penetrateTaskConn *PenetrateTaskConnMap
+	penetrateTask     map[string]proto.Wormhole_PenetrateTaskServer // 管理器
+}
+
+type PenetrateTaskConnMap struct {
+	rmap map[string]chan net.Conn
+	mu   sync.Mutex
+}
+
+func NewPenetrateTaskConnMap() *PenetrateTaskConnMap {
+	return &PenetrateTaskConnMap{
+		rmap: map[string]chan net.Conn{},
+	}
+}
+
+func (p *PenetrateTaskConnMap) Storage(key string, conn net.Conn) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	conns, ex := p.rmap[key]
+	if !ex {
+		p.rmap[key] = make(chan net.Conn, 9999)
+		conns = p.rmap[key]
+	}
+
+	conns <- conn
+}
+
+func (p *PenetrateTaskConnMap) Get(key string) chan net.Conn {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	conns, ex := p.rmap[key]
+	if !ex {
+		p.rmap[key] = make(chan net.Conn, 9999)
+		conns = p.rmap[key]
+	}
+
+	return conns
 }
 
 func NewCoreServer() *CoreServer {
-	return &CoreServer{
-		taskConn:      map[string]*TaskCore{},
-		penetrate:     map[string]chan proto.Wormhole_PenetrateServer{},
-		penetrateTask: map[string]proto.Wormhole_PenetrateTaskServer{},
+	fs := newFlashStorage()
+	fs.init()
+
+	core := &CoreServer{
+		flashStorage:      fs,
+		taskConn:          map[string]*TaskCore{},
+		penetrateTaskConn: NewPenetrateTaskConnMap(),
+		penetrateTask:     map[string]proto.Wormhole_PenetrateTaskServer{},
 	}
+
+	core.init()
+
+	return core
 }
 
 type TaskCore struct {
@@ -43,6 +87,8 @@ func (c *CoreServer) init() {
 			log.Println(err)
 			continue
 		}
+
+		fmt.Println("ListenTCP: ", addr)
 		listener, err := net.ListenTCP("tcp", addr)
 		if err != nil {
 			log.Println(err)
@@ -79,9 +125,7 @@ loop:
 				if err != nil {
 					return
 				}
-
-				defer accept.Close()
-
+				c.penetrateTaskConn.Storage(core.task.TaskId, accept)
 				server, ex := c.penetrateTask[core.task.Node.NodeId]
 				if !ex {
 					return
@@ -89,19 +133,12 @@ loop:
 
 				e := server.Send(&proto.PenetrateTaskResponse{
 					TaskId:    core.task.TaskId,
-					LocalPort: core.task.RemotePort,
+					LocalPort: core.task.LocalPort,
 				})
 				if e != nil {
-					log.Println(err)
+					log.Println(e)
 					return
 				}
-
-				ser := <-c.penetrate[core.task.TaskId]
-
-				wm := proto.WormholeReadWrite{ser}
-
-				go io.Copy(&wm, accept)
-				io.Copy(accept, &wm)
 			}
 
 			fn()
@@ -110,7 +147,7 @@ loop:
 }
 
 func (c *CoreServer) RegisterNode(ctx context.Context, request *proto.RegisterNodeRequest) (*proto.RegisterNodeResponse, error) {
-	c.flashStorage.registerNode(request.NodeIp, request.NodeName, request.NodeIp)
+	c.flashStorage.registerNode(request.NodeId, request.NodeName, request.NodeIp)
 	return &proto.RegisterNodeResponse{}, nil
 }
 
@@ -139,8 +176,39 @@ func (c *CoreServer) Penetrate(server proto.Wormhole_PenetrateServer) error {
 		return err
 	}
 
-	ser := c.penetrate[recv.TaskId]
-	ser <- server
+	conn := <-c.penetrateTaskConn.Get(recv.TaskId)
+	defer conn.Close()
+
+	w := proto.WormholeReadWrite{server}
+	go io.Copy(&w, conn)
+	io.Copy(conn, &w)
+
+	//go func() {
+	//	for {
+	//		request, e := server.Recv()
+	//		if e != nil {
+	//			log.Println(e)
+	//			return
+	//		}
+	//		_, e = conn.Write(request.Data)
+	//		if e != nil {
+	//			log.Println(e)
+	//			return
+	//		}
+	//	}
+	//}()
+	//
+	//for {
+	//	buffer := make([]byte, 1024)
+	//	n, e := conn.Read(buffer)
+	//	if e != nil {
+	//		log.Println(e)
+	//		break
+	//	}
+	//	server.Send(&proto.PenetrateResponse{
+	//		Data: buffer[:n],
+	//	})
+	//}
 
 	return nil
 }
@@ -152,17 +220,6 @@ func (c *CoreServer) PenetrateTask(server proto.Wormhole_PenetrateTaskServer) er
 		return err
 	}
 
-	// 心跳
-	go func() {
-		for {
-			_, err := server.Recv()
-			if err != nil {
-				log.Println(err)
-				return
-			}
-		}
-	}()
-
 	var fn = func() {
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -171,5 +228,12 @@ func (c *CoreServer) PenetrateTask(server proto.Wormhole_PenetrateTaskServer) er
 
 	fn()
 
-	return nil
+	// 心跳
+	for {
+		_, err := server.Recv()
+		if err != nil {
+			log.Println(err)
+			return nil
+		}
+	}
 }

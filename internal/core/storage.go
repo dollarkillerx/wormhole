@@ -17,6 +17,13 @@ type flashStorage struct {
 	Tasks []*proto.Task `json:"tasks"`
 }
 
+func newFlashStorage() *flashStorage {
+	return &flashStorage{
+		Nodes: []*proto.Node{},
+		Tasks: []*proto.Task{},
+	}
+}
+
 func (s *flashStorage) init() {
 	file, err := os.ReadFile("wormhole_storage.json")
 	if err == nil {
