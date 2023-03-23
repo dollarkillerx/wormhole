@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/dollarkillerx/wormhole/internal/ca"
@@ -88,22 +87,14 @@ func main() {
 			fmt.Println("------------------------------------")
 			fmt.Println()
 		case "3":
-			fmt.Print("(nodeId, remotePort, localPort) $: ")
+			fmt.Print("(nodeId, remoteAddr, localAddr) $: ")
 			fmt.Scanln(&input)
 			input = strings.TrimSpace(input)
 			split := strings.Split(input, ",")
-			remotePort, e := strconv.Atoi(split[1])
-			if e != nil {
-				panic(e)
-			}
-			localPort, e := strconv.Atoi(split[2])
-			if e != nil {
-				panic(e)
-			}
-			_, e = client.AddTask(context.TODO(), &proto.AddTaskRequest{
+			_, e := client.AddTask(context.TODO(), &proto.AddTaskRequest{
 				NodeId:     split[0],
-				RemotePort: int64(remotePort),
-				LocalPort:  int64(localPort),
+				RemoteAddr: split[1],
+				LocalAddr:  split[2],
 			})
 			if e != nil {
 				panic(e)
@@ -115,7 +106,7 @@ func main() {
 			}
 			fmt.Println("------------------------------------")
 			for _, v := range tasks.Tasks {
-				fmt.Printf("TaskID: %s NodeID: %s %s %s %d %d\n", v.TaskId, v.Node.NodeId, v.Node.NodeName, v.Node.NodeIp, v.RemotePort, v.LocalPort)
+				fmt.Printf("TaskID: %s NodeID: %s %s %s %s %s\n", v.TaskId, v.Node.NodeId, v.Node.NodeName, v.Node.NodeIp, v.RemoteAddr, v.LocalAddr)
 			}
 			fmt.Println("------------------------------------")
 			fmt.Println()
@@ -126,7 +117,7 @@ func main() {
 			}
 			fmt.Println("------------------------------------")
 			for _, v := range tasks.Tasks {
-				fmt.Printf("TaskID: %s NodeID: %s %s %s %d %d\n", v.TaskId, v.Node.NodeId, v.Node.NodeName, v.Node.NodeIp, v.RemotePort, v.LocalPort)
+				fmt.Printf("TaskID: %s NodeID: %s %s %s %s %s\n", v.TaskId, v.Node.NodeId, v.Node.NodeName, v.Node.NodeIp, v.RemoteAddr, v.LocalAddr)
 			}
 			fmt.Println("------------------------------------")
 			fmt.Println()
@@ -147,7 +138,7 @@ func main() {
 			}
 			fmt.Println("------------------------------------")
 			for _, v := range tasks.Tasks {
-				fmt.Printf("TaskID: %s NodeID: %s %s %s %d %d\n", v.TaskId, v.Node.NodeId, v.Node.NodeName, v.Node.NodeIp, v.RemotePort, v.LocalPort)
+				fmt.Printf("TaskID: %s NodeID: %s %s %s %d %d\n", v.TaskId, v.Node.NodeId, v.Node.NodeName, v.Node.NodeIp, v.RemoteAddr, v.LocalAddr)
 			}
 			fmt.Println("------------------------------------")
 			fmt.Println()

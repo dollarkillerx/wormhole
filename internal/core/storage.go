@@ -111,7 +111,7 @@ func (s *flashStorage) getTaskByIdMu(taskId string) (*proto.Task, bool) {
 	return nil, false
 }
 
-func (s *flashStorage) addTask(nodeId string, remotePort int64, localPort int64) (string, error) {
+func (s *flashStorage) addTask(nodeId string, remoteAddr string, localAddr string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	defer s.flash()
@@ -125,8 +125,8 @@ func (s *flashStorage) addTask(nodeId string, remotePort int64, localPort int64)
 	taskID := uuid.New().String()
 	s.Tasks = append(s.Tasks, &proto.Task{
 		TaskId:     taskID,
-		RemotePort: remotePort,
-		LocalPort:  localPort,
+		RemoteAddr: remoteAddr,
+		LocalAddr:  localAddr,
 		Node:       node,
 	})
 

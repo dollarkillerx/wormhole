@@ -82,7 +82,7 @@ type TaskCore struct {
 func (c *CoreServer) init() {
 	tasks := c.flashStorage.listTask()
 	for i, v := range tasks {
-		addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", v.RemotePort))
+		addr, err := net.ResolveTCPAddr("tcp", v.RemoteAddr)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -135,7 +135,7 @@ loop:
 
 				e := server.Send(&proto.PenetrateTaskResponse{
 					TaskId:    core.task.TaskId,
-					LocalPort: core.task.LocalPort,
+					LocalAddr: core.task.LocalAddr,
 				})
 				if e != nil {
 					log.Println(e)
@@ -158,10 +158,10 @@ func (c *CoreServer) ListNode(ctx context.Context, request *proto.ListNodeReques
 }
 
 func (c *CoreServer) AddTask(ctx context.Context, request *proto.AddTaskRequest) (*proto.AddTaskResponse, error) {
-	taskID, err := c.flashStorage.addTask(request.NodeId, request.RemotePort, request.LocalPort)
+	taskID, err := c.flashStorage.addTask(request.NodeId, request.RemoteAddr, request.LocalAddr)
 	task, _ := c.flashStorage.getTaskByIdMu(taskID)
 
-	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", request.RemotePort))
+	addr, err := net.ResolveTCPAddr("tcp", request.RemoteAddr)
 	if err != nil {
 		log.Println(err)
 		return nil, err

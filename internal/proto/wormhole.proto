@@ -26,7 +26,7 @@ message PenetrateTaskRequest {
 message PenetrateTaskResponse {
   bool heartbeat = 1;
   string taskId = 2;
-  int64 localPort = 3;
+  string localAddr = 3;
 }
 
 message PenetrateRequest {
@@ -60,8 +60,8 @@ message Node {
 
 message AddTaskRequest {
   string nodeId = 1; // 节点id
-  int64 remotePort = 2; // 远程端口
-  int64 localPort = 3; // 本地端口
+  string remoteAddr = 2; // 远程端口
+  string localAddr = 3; // 本地端口
 }
 
 message AddTaskResponse {
@@ -78,8 +78,8 @@ message ListTaskResponse {
 
 message Task {
   string taskId = 1;
-  int64 remotePort = 2; // 远程端口
-  int64 localPort = 3; // 本地端口
+  string remoteAddr = 2; // 远程端口
+  string localAddr = 3; // 本地端口
   Node node = 4; // task node
 }
 

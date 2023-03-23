@@ -61,7 +61,7 @@ lc:
 		// 心跳
 		go func() {
 			for {
-				fmt.Println("node id: ", nodeId)
+				fmt.Println("heartbeat node id: ", nodeId)
 				e := task.Send(&proto.PenetrateTaskRequest{
 					NodeId: nodeId,
 				})
@@ -103,7 +103,7 @@ lc:
 
 			go func() {
 				//fmt.Println("dial: ", fmt.Sprintf("127.0.0.1:%d", recv.LocalPort))
-				dial, e := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", recv.LocalPort))
+				dial, e := net.Dial("tcp", recv.LocalAddr)
 				if e != nil {
 					log.Println(e)
 					return
